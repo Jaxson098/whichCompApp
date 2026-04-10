@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>FRC comp info</title>
+</head>
+<body>
+<h3>A utility for figuring out what FRC comp your team should travel to.</h3>
+<p>Built by: Jaxson Slotnick-Paige</p>
+<p>Powered by: <a href="https://www.thebluealliance.com/">The Blue Alliance</a></p>
+<br>
+<label for="yearInput">Year:</label>
+<input id="yearInput" type="number" value="2025">
+<br><br>
+
+<div style="border: 1px black solid;">
+    <label>Comp types:</label>
+    <br>
+    <input type="checkbox" id="include_Offseason"><label for="include_offseason">Offseason</label><br>
+    <input type="checkbox" id="include_Regional"><label for="include_Regional">Regional</label><br>
+    <input type="checkbox" id="include_District"><label for="include_District">District</label><br>
+    <input type="checkbox" id="include_District_Championship"><label for="include_District_Championship">District Championship</label><br>
+    <input type="checkbox" id="include_World_Championship"><label for="include_World_Championship">World Championship</label><br>
+</div>
+
+<br>
+<a id="downloadA"><button id="GETbutton">Get .csv</button></a>
+<br>
+<p id="compName"></p>
+<p id="downloaded"></p>
+<p id="skipped"></p>
+<script>
+    const currentYear = new Date().getFullYear();
+    const yearInput = document.getElementById("yearInput");
+    const GETbutton = document.getElementById("GETbutton");
+    const downloadA = document.getElementById("downloadA");
+    const compName = document.getElementById("compName");
+    const downloadedP = document.getElementById("downloaded");
+    const skippedP = document.getElementById("skipped");
+
+    const include_Offseason = document.getElementById("include_Offseason");
+    const include_Regional = document.getElementById("include_Regional");
+    const include_District = document.getElementById("include_District");
+    const include_District_Championship = document.getElementById("include_District_Championship");
+    const include_World_Championship = document.getElementById("include_World_Championship");
+
+    yearInput.addEventListener("change", function () {
+        if (Number(yearInput.value) > currentYear) {yearInput.value = currentYear;}
+        else if (Number(yearInput.value) < 2016) {yearInput.value = 2016;}
+    })
+
+    GETbutton.addEventListener("click", async function () {
+        GETbutton.disabled = true;
+        yearInput.disabled = true;
+        include_Offseason.disabled = true;
+        include_Regional.disabled = true;
+        include_District.disabled = true;
+        include_District_Championship.disabled = true;
+        include_World_Championship.disabled = true;
+
+        downloaded = 0;
+        skipped = 0;
+
+        csv = "";
+
+        csv += "Year: " + yearInput.value + "\n" + "Comp name,Type,Week,Avg pts,Avg win pts,Avg loose pts,Avg qualifier pts,Avg qualifier win pts,Avg qualifier loose pts,Avg playoff pts,Avg playoff win pts,Avg playoff loose pts,"
+            + "Win/loose % diff,Qualifier win/loose % diff,Playoff win/loose % diff\n";
+        
+        const res = await fetch("https://www.thebluealliance.com/api/v3/events/"+yearInput.value+"?X-TBA-Auth-Key=xy28913hEz1qhzr6jPckDxbF6ZBTC5Y93TCKeAO0ZdSl61DCu2chD1tkGD2KsxoX");
+        const data = await res.json();
+
+        toDownload = data.length;
+
+        for (const comp of data) {
+
+            toInclude = false;
+            if (include_Offseason.checked && comp.event_type_string == "Offseason") {toInclude=true;}
+            if (include_Regional.checked && comp.event_type_string == "Regional") {toInclude=true;}
+            if (include_District.checked && comp.event_type_string == "District") {toInclude=true;}
+            if (include_District_Championship.checked && comp.event_type_string == "District Championship") {toInclude=true;}
+            if (include_District_Championship.checked && comp.event_type_string == "District Championship Division") {toInclude=true;}
+            if (include_World_Championship.checked && comp.event_type_string == "Championship Division") {toInclude=true;}
+            if (include_World_Championship.checked && comp.event_type_string == "Championship Finals") {toInclude=true;}
+
+            numOfQuals = 0; qualScoreSum = 0; qualWinScoreSum = 0; qualLooseScoreSum = 0; 
+            numOfPlayoffs = 0; playoffScoreSum = 0; playoffWinScoreSum = 0; playoffLooseScoreSum = 0;
+            numOfMatches = 0; scoreSum = 0; scoreWinSum = 0; scoreLooseSum = 0;
+
+            if (toInclude == true) {
+
+                // csv += comp.name + ",";
+                // if (Number(comp.event_type) == 99) {csv += "1" + ",";}  else {csv += "0" + ",";}
+                // csv += comp.event_type_string + "," + comp.week + ",";
+
+                const eventRaw = await fetch("https://www.thebluealliance.com/api/v3/event/"+comp.key+"/matches?X-TBA-Auth-Key=xy28913hEz1qhzr6jPckDxbF6ZBTC5Y93TCKeAO0ZdSl61DCu2chD1tkGD2KsxoX");
+                const eventJSON = await eventRaw.json();
+                
+                // downloaded++;
+
+                console.log(comp.key);
+                compName.textContent = "Downloading for: " + comp.name + "...";
+
+                for (const match of eventJSON) {
+                    if (match.score_breakdown != null) {
+                        numOfMatches++;
+                        scoreSum += Number(match.score_breakdown.blue.totalPoints);
+                        scoreSum += Number(match.score_breakdown.red.totalPoints);
+                        if (match.comp_level == "qm") {
+                            numOfQuals++;
+                            qualScoreSum += Number(match.score_breakdown.blue.totalPoints);
+                            qualScoreSum += Number(match.score_breakdown.red.totalPoints);
+                            if (match.winning_alliance == "red") {
+                                qualWinScoreSum += Number(match.score_breakdown.red.totalPoints);
+                                scoreWinSum += Number(match.score_breakdown.red.totalPoints);
+                                qualLooseScoreSum += Number(match.score_breakdown.blue.totalPoints);
+                                scoreLooseSum += Number(match.score_breakdown.blue.totalPoints);
+                            } else {
+                                qualWinScoreSum += Number(match.score_breakdown.blue.totalPoints);
+                                scoreWinSum += Number(match.score_breakdown.blue.totalPoints);
+                                qualLooseScoreSum += Number(match.score_breakdown.red.totalPoints);
+                                scoreLooseSum += Number(match.score_breakdown.red.totalPoints);
+                            }
+                        } else {
+                            numOfPlayoffs++;
+                            playoffScoreSum += Number(match.score_breakdown.blue.totalPoints);
+                            playoffScoreSum += Number(match.score_breakdown.red.totalPoints);
+                            if (match.winning_alliance == "red") {
+                                playoffWinScoreSum += Number(match.score_breakdown.red.totalPoints);
+                                scoreWinSum += Number(match.score_breakdown.red.totalPoints);
+                                playoffLooseScoreSum += Number(match.score_breakdown.blue.totalPoints);
+                                scoreLooseSum += Number(match.score_breakdown.blue.totalPoints);
+                            } else {
+                                playoffWinScoreSum += Number(match.score_breakdown.blue.totalPoints);
+                                scoreWinSum += Number(match.score_breakdown.blue.totalPoints);
+                                playoffLooseScoreSum += Number(match.score_breakdown.red.totalPoints);
+                                scoreLooseSum += Number(match.score_breakdown.red.totalPoints);
+                            }
+                        }
+                    }
+                }
+            }
+
+
+            if (scoreSum/(2*numOfMatches) > 0) {
+
+                csv += String(comp.name).replaceAll(",","") + ",";
+                csv += comp.event_type_string + "," + comp.week + ",";
+
+                csv += String(Math.round((scoreSum/(2*numOfMatches))*100)/100) + "," + String(Math.round((scoreWinSum/numOfMatches)*100)/100) + "," + String(Math.round((scoreLooseSum/numOfMatches)*100)/100) + "," 
+                    + String(Math.round((qualScoreSum/(2*numOfQuals))*100)/100) + "," + String(Math.round((qualWinScoreSum/numOfQuals)*100)/100) + "," + String(Math.round((qualLooseScoreSum/numOfQuals)*100)/100) + ","  
+                    + String(Math.round((playoffScoreSum/(2*numOfPlayoffs))*100)/100) + "," + String(Math.round((playoffWinScoreSum/numOfPlayoffs)*100)/100) + "," + String(Math.round((playoffLooseScoreSum/numOfPlayoffs)*100)/100) + ","  
+                    + String(Math.round((Math.abs((scoreWinSum/numOfMatches - scoreLooseSum/numOfMatches)/(scoreWinSum/numOfMatches))*100)*100)/100) + "%" + "," 
+                    + String(Math.round((Math.abs((qualWinScoreSum/numOfQuals - qualLooseScoreSum/numOfQuals)/(qualWinScoreSum/numOfQuals))*100)*100)/100) + "%" + "," 
+                    + String(Math.round((Math.abs((playoffWinScoreSum/numOfPlayoffs - playoffLooseScoreSum/numOfPlayoffs)/(playoffWinScoreSum/numOfPlayoffs))*100)*100)/100) + "%" + "\n";
+            } else {
+            }
+        }
+
+        compName.textContent = "Done" 
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        downloadA.href = url;
+
+        fileName = yearInput.value + "_comps";
+        if (include_Offseason.checked) {fileName += "_Offseason";}
+        if (include_Regional.checked) {fileName += "_Regional";}
+        if (include_District.checked) {fileName += "_District";}
+        if (include_District_Championship.checked) {fileName += "_DistrictChampionship";}
+        if (include_World_Championship.checked) {fileName += "_WorldChampionship";}
+        fileName += ".csv"
+
+        downloadA.download = fileName;
+        downloadA.click();
+
+        GETbutton.disabled = false;
+        yearInput.disabled = false;
+        include_Offseason.disabled = false;
+        include_Regional.disabled = false;
+        include_District.disabled = false;
+        include_District_Championship.disabled = false;
+        include_World_Championship.disabled = false;
+    })
+</script>
+</body>
+</html>
